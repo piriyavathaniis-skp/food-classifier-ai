@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Food Classifier AI (Upload + Webcam)</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 25px;
+            width: 500px;
+            text-align: center;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.4);
+            color: #fff;
+        }
+
+        input, button {
+            margin: 6px;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            font-weight: bold;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        #preview, #webcam-container canvas {
+            margin-top: 10px;
+            border-radius: 15px;
+        }
+
+        #result {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        canvas.chart {
+            margin-top: 10px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card">
+
+    <h2>🍎 Food Classifier AI</h2>
+    <p>Upload image OR use webcam live detection</p>
+
+    <button onclick="startWebcam()">📸 Start Webcam</button>
+    <button onclick="stopWebcam()">🛑 Stop Webcam</button>
+
+    <br>
+
+    <input type="file" id="imageUpload" accept="image/*">
+
+    <br>
+
+    <img id="preview" width="250">
+
+    <div id="webcam-container"></div>
+
+    <h2 id="result">Loading model...</h2>
+
+    <canvas id="chart" class="chart"></canvas>
+
+</div>
+
+<script>
+
+const MODEL_URL = "tm-my-image-model/";  // ✅ FIXED (NO ./)
+
+let model, webcam, chart;
+
+// ----------------------
+// LOAD MODEL (FIXED)
+// ----------------------
+async function loadModel() {
+    try {
+        model = await tmImage.load(
+            MODEL_URL + "model.json",
+            MODEL_URL + "metadata.json"
+        );
+
+        document.getElementById("result").innerText =
+            "Model loaded ✔ Upload or use webcam";
+    } catch (err) {
+        console.error(err);
+        document.getElementById("result").innerText =
+            "❌ Model failed to load (check folder path)";
+    }
+}
+
+loadModel();
+
+
+// ----------------------
+// UPLOAD IMAGE
+// ----------------------
+document.getElementById("imageUpload").addEventListener("change", function(event) {
+
+    stopWebcam();
+
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const img = document.getElementById("preview");
+    img.src = URL.createObjectURL(file);
+
+    img.onload = async function () {
+        await predict(img);
+    };
+});
+
+
+// ----------------------
+// WEBCAM START
+// ----------------------
+async function startWebcam() {
+
+    const flip = true;
+
+    webcam = new tmImage.Webcam(250, 250, flip);
+    await webcam.setup();
+    await webcam.play();
+
+    document.getElementById("webcam-container").innerHTML = "";
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+    loop();
+}
+
+// STOP WEBCAM
+function stopWebcam() {
+    if (webcam) webcam.stop();
+    document.getElementById("webcam-container").innerHTML = "";
+}
+
+// LIVE LOOP
+async function loop() {
+    if (webcam) {
+        webcam.update();
+        await predict(webcam.canvas);
+        window.requestAnimationFrame(loop);
+    }
+}
+
+
+// ----------------------
+// PREDICTION (FIXED)
+// ----------------------
+async function predict(image) {
+
+    if (!model) {
+        document.getElementById("result").innerText =
+            "Model still loading...";
+        return;
+    }
+
+    const prediction = await model.predict(image);
+
+    let best = prediction[0];
+
+    for (let p of prediction) {
+        if (p.probability > best.probability) {
+            best = p;
+        }
+    }
+
+    document.getElementById("result").innerText =
+        best.className + " (" + (best.probability * 100).toFixed(2) + "%)";
+
+    drawChart(prediction);
+}
+
+
+// ----------------------
+// CHART (FIXED)
+// ----------------------
+function drawChart(prediction) {
+
+    const labels = prediction.map(p => p.className);
+    const data = prediction.map(p => p.probability * 100);
+
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Probability (%)",
+                data: data,
+                backgroundColor: "rgba(255,255,255,0.6)"
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+
+</script>
+
+</body>
+</html>
