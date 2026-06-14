@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Food Classifier (Fresh vs Spoiled)</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- TensorFlow + Teachable Machine -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        video, img {
+            margin-top: 20px;
+            border-radius: 10px;
+        }
+
+        #result {
+            font-size: 20px;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🍎 Food Classifier (Fresh vs Spoiled)</h1>
+
+    <button onclick="loadModel()">Load Model</button>
+    <button onclick="startWebcam()">Start Webcam</button>
+    <button onclick="predict()">Predict</button>
+
+    <div>
+        <video id="webcam" width="300" autoplay playsinline></video>
+    </div>
+
+    <div id="result">Model not loaded</div>
+
+<script>
+    // 🔥 CHANGE THIS LINK
+    const MODEL_URL = "https://YOUR_USERNAME.github.io/YOUR_REPO/tm-my-image-model/";
+
+    let model;
+    let webcamStream;
+
+    // Load model
+    async function loadModel() {
+        try {
+            model = await tmImage.load(
+                MODEL_URL + "model.json",
+                MODEL_URL + "metadata.json"
+            );
+
+            document.getElementById("result").innerText =
+                "Model loaded ✔ Ready to predict";
+
+            console.log("Model loaded successfully");
+        } catch (err) {
+            console.error(err);
+            document.getElementById("result").innerText =
+                "❌ Failed to load model (check GitHub link)";
+        }
+    }
+
+    // Start webcam
+    async function startWebcam() {
+        try {
+            const video = document.getElementById("webcam");
+
+            webcamStream = await navigator.mediaDevices.getUserMedia({
+                video: true
+            });
+
+            video.srcObject = webcamStream;
+
+            document.getElementById("result").innerText =
+                "Webcam started ✔";
+        } catch (err) {
+            console.error(err);
+            document.getElementById("result").innerText =
+                "❌ Webcam access denied";
+        }
+    }
+
+    // Predict
+    async function predict() {
+        if (!model) {
+            alert("Load the model first!");
+            return;
+        }
+
+        const video = document.getElementById("webcam");
+
+        const prediction = await model.predict(video);
+
+        let best = prediction[0];
+
+        for (let i = 1; i < prediction.length; i++) {
+            if (prediction[i].probability > best.probability) {
+                best = prediction[i];
+            }
+        }
+
+        document.getElementById("result").innerText =
+            `Prediction: ${best.className} (${(best.probability * 100).toFixed(2)}%)`;
+    }
+</script>
+
+</body>
+</html>
